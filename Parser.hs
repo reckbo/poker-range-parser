@@ -1,6 +1,7 @@
 import           Control.Applicative
+import           Data.List           (nub)
+import qualified Data.Map            as M
 import           Text.Trifecta
-import qualified Data.Map as M
 
 -- J9-54
 -- AK-QJo
@@ -19,7 +20,7 @@ data AST = Or AST AST |
  | ComboA Rank Rank
  | ComboS Rank Rank
  | ComboO Rank Rank
- | Combo Rank Suit Rank Suit
+ | ComboOne Combo
  | Empty
  deriving Show
 
@@ -32,9 +33,9 @@ parseRank = fmap rankFromChar $ oneOf "AKQJT98765432"
 parseSuit :: Parser Suit
 parseSuit = fmap suitFromChar $ oneOf "cdsh"
 
-parseCombo :: Parser AST
-parseCombo = Combo <$> parseRank <*> parseSuit <*>
-                       parseRank <*> parseSuit
+parseComboOne :: Parser AST
+parseComboOne = ComboOne <$> (Combo <$> card <*> card)
+                  where card = (Card <$> parseRank <*> parseSuit)
 
 parseComboO :: Parser AST
 parseComboO = ComboO <$> parseRank <*> parseRank <* char 'o'
@@ -64,7 +65,7 @@ parseAST = (foldr Or Empty) <$> asts
           try parseRangeO,
           try parseRangeA,
           try parseRange,
-          try parseCombo,
+          try parseComboOne,
           try parseComboS,
           try parseComboO,
           try parseComboA
@@ -108,4 +109,19 @@ rankFromChar c = case M.lookup c charRankMap of
   Nothing -> error "rankFromChar"
 
 data Card = Card Rank Suit
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show Card where
+  show (Card r s) = (show r) ++ (show s)
+
+data Combo = Combo Card Card
+  deriving Eq
+
+instance Show Combo where
+  show (Combo c c') = (show c) ++ (show c')
+
+interpret :: AST -> [Combo]
+interpret Empty = []
+interpret (Or ast ast') = nub $ (interpret ast) ++ (interpret ast')
+interpret (ComboOne c) = [c]
+
