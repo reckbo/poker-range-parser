@@ -108,20 +108,45 @@ rankFromChar c = case M.lookup c charRankMap of
   Just x -> x
   Nothing -> error "rankFromChar"
 
-data Card = Card Rank Suit
+data Card = Card { rank::Rank, suit::Suit }
   deriving Eq
 
 instance Show Card where
-  show (Card r s) = (show r) ++ (show s)
+  show (Card r s) = show r ++ show s
 
 data Combo = Combo Card Card
   deriving Eq
 
 instance Show Combo where
-  show (Combo c c') = (show c) ++ (show c')
+  show (Combo c c') = show c ++ show c'
+
+suits :: [Suit]
+suits = [Club .. Spade]
+
+ranks :: [Rank]
+ranks = [R2 .. A]
+
+suited :: Combo -> Bool
+suited (Combo c c') = suit c == suit c'
+
+offsuit :: Combo -> Bool
+offsuit = not . suited
 
 interpret :: AST -> [Combo]
 interpret Empty = []
-interpret (Or ast ast') = nub $ (interpret ast) ++ (interpret ast')
+interpret (Or ast ast') = nub $ interpret ast ++ interpret ast'
 interpret (ComboOne c) = [c]
+interpret (ComboA r r') = [Combo (Card r s) (Card r' s') | s <- suits, s' <- suits]
+interpret (ComboS r r') = filter suited $ interpret $ ComboA r r'
+interpret (ComboO r r') = filter offsuit (interpret $ ComboA r r')
 
+fromResult :: Result a -> a
+fromResult (Success x) = x
+fromResult (Failure doc) = error $ show doc
+
+main :: IO ()
+main = do
+  print $ fromResult $ interpret <$> parseString parseAST mempty "AcQc"
+  print $ fromResult $ interpret <$> parseString parseAST mempty "AK"
+  print $ fromResult $ interpret <$> parseString parseAST mempty "JTs"
+  print $ fromResult $ interpret <$> parseString parseAST mempty "KQo"
